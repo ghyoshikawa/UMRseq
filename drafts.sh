@@ -155,5 +155,4 @@ normal_res \
 a_agfs_ps
 
 
-rsync -r /scratch/user/uqgventu/analysis/trimmed_align_* /QRISdata/Q9486/data/UMR_test/
 
