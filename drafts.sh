@@ -154,5 +154,18 @@ normal_res \
 ~/refseqs/dummy_blacklist.bed \
 a_agfs_ps
 
+cd /home/uqgventu/gitrepos/umrseq/In-silico-digest
+
+bash \
+/home/uqgventu/gitrepos/umrseq/In-silico-digest/in-silico-digest_sbatch.sh \
+-g /home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0.fa \
+-o /home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0_digest \
+-f 100 \
+-M /home/uqgventu/UMR_sorghum/RE_motifs.fa \
+-G /home/uqgventu/gitrepos/ \
+-A a_agfs_ps \
+-m 50 \
+-c 1 \
+-t 4:00:00
 
 
