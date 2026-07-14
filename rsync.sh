@@ -8,10 +8,12 @@
 #SBATCH --mem=20G                   # memory pool for all cores
 #SBATCH --qos=normal
 #SBATCH --account=a_agfs_ps
-#SBATCH --job-name=rsync
+#SBATCH --job-name=rsync1
 #SBATCH -o ./out/rsync.%j.out             # output file
 #SBATCH -e ./out/rsync.%j.err             # error file
 #SBATCH --mail-type=END		        # Notifications (once the code words, change to END to avoid too many emails)
-#SBATCH --mail-user=g.vyoshikawa@uq.edu.au
 
-rsync AGRF_CAGRF221112563_HMCLFDSX5.tar /QRISdata/Q9486/data/
+tar -czf /$TMPDIR/trimmed_align_bowtie2.tar.gz \
+-C /scratch/user/uqgventu/analysis trimmed_align_bowtie2 \
+&&  rsync -av /$TMPDIR/trimmed_align_bowtie2.tar.gz \
+/QRISdata/Q9486/data/Sb-UMRseq-diversity-panel/analysis/
