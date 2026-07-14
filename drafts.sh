@@ -45,7 +45,7 @@ bash \
 samples.txt \
 20:00:00 \
 16 \
-cutadapt_v3.7 \ 
+cutadapt_v3.7 \
 a_agfs_ps
 
 module load miniconda3/23.9.0-0
@@ -59,21 +59,24 @@ multiqc .
 #after its run deactivate your environment
 conda deactivate
 mv multiqc_report.html multiqc_report1.html
-rsync -rhiPvt multiqc_* /QRISdata/Q9486/data/
+mkdir /QRISdata/Q9486/data/multiqc_results/
+mkdir /QRISdata/Q9486/data/fastqc_results/
+
+rsync -rhiPvt multiqc_* /QRISdata/Q9486/data/multiqc_results/
 
 cd logs/20260529-160836_01-trim_galore_gz_01
 less 01-trim_galore_gz_e1
-echo -e "Sample\tTotal_sequences_analysed\tPERCENT_READS_WITH_ADAPTERS_R1\tPERCENT_READS_WITH_ADAPTERS_R2\tPERCENT_BP_TRIMMED_R1\tPERCENT_BP_TRIMMED_R2" > ../total_reads_summary1.tsv
+echo -e "Sample\tTotal_sequences_analysed\tPERCENT_READS_WITH_ADAPTERS_R1\tPERCENT_READS_WITH_ADAPTERS_R2\tPERCENT_BP_TRIMMED_R1\tPERCENT_BP_TRIMMED_R2" > total_reads_summary.tsv
 for i in $(ls 01-trim_galore_gz_01_e*); do
 SAMPLE=$(grep '+ ID=' $i | cut -d "=" -f 2)
 TOTAL_READS=$(grep 'Total number of sequences analysed:' $i | tr -s ' ' | cut -d " " -f 6)
 PERCENT_READS_WITH_ADAPTERS=$(grep 'Reads with adapters:' $i | tr -s ' ' | cut -d " " -f 5 | paste -sd '\t')
 PERCENT_BP_TRIMMED=$(grep 'Quality-trimmed:' $i | tr -s ' ' | cut -d " " -f 4 | paste -sd '\t')
 echo -e "$SAMPLE\t$TOTAL_READS\t$PERCENT_READS_WITH_ADAPTERS\t$PERCENT_BP_TRIMMED"
-done >> ../total_reads_summary1.tsv
+done >> total_reads_summary.tsv
 
 #view output:
-cat ../total_reads_summary1.tsv | column -t
+cat total_reads_summary.tsv | column -t
 
 cd /scratch/user/uqgventu/
 vim samples_new.txt 
@@ -81,20 +84,22 @@ vim samples_new.txt
 touch samples_new.txt
 nano samples_new.txt
 #make sure name order matches samples.txt to get corretn renaming in the next step
+sort samples.txt > samples_sorted.txt
+sort samples_new.txt > samples_new_sorted.txt
 
-paste -d '\t' samples.txt <(cut -f1 samples_new.txt) > samples_key.tsv
+paste -d '\t' samples_sorted.txt <(cut -f1 samples_new_sorted.txt) > samples_key.tsv
 cat samples_key.tsv | column -t
 mv analysis/trimmed analysis/trimmed_lanes
 mkdir analysis/trimmed
-sbatch cat.sh
+sbatch --array=1-$(wc -l < samples_key.tsv) cat.sh samples_key.tsv
 
 #alignment:
 bash \
 /home/uqgventu/gitrepos/umrseq/UMRseq/02-bowtie2_sbatch_01.sh \
-samples_rename_merge.txt \
-trimmed \
+samples_renamed_merged.txt \
+/scratch/user/uqgventu/analysis/trimmed/ \
 6 \
-~/refseqs/sorghum/Sbicolor_454_v3.0.1 \
+/home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0 \
 10 \
 18:00:00 \
 40 \
