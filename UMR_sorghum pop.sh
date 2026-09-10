@@ -196,6 +196,7 @@ a_agfs_ps
 
 cd /scratch/user/uqgventu/analysis/trimmed_align_bowtie2_epic2
 bin_Size=50
+#bin_Size=100
 
 # set this to match your epic2 output naming
 for i in $(cat ../../samples_renamed_merged.txt); do
@@ -245,7 +246,7 @@ awk '{ total += $4 } END { print total/NR }' -
 #and the mean fragment size from 1550.09 to 884.9, nr of regions from 80959.7 to 117620. 
 #So this is a good thing, better resolution
 
-#FRIP score with bin size 50 (bin size 100 got overwritten)
+#FRIP score with bin size 50 
 
 for i in $(cat ../../samples_renamed_merged.txt); do
 SAMPLE=$i
@@ -260,3 +261,17 @@ cat FRIP_scraped.tsv | column -t
 sed '1d' FRIP_scraped.tsv |
 awk '{ total += $2 } END { print total/NR }' -
 #average FRIP score 84.37
+
+#FRIP score with bin size 100 
+#average FRIP score 86.8
+
+bash \
+/home/uqgventu/gitrepos/umrseq/UMRseq/03c-deeptools-hacked_bigWig_sbatch.sh \
+samples_renamed_merged.txt \
+3:00:00 \
+20 \
+trimmed_align_bowtie2 \
+deeptools-hacked_v3.8 \
+normal_res \
+/home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0/Sbicolor_730_v5.0-fragments-filtered-50%Ns.bed \
+a_agfs_ps

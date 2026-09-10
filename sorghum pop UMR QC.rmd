@@ -1,0 +1,442 @@
+---
+title: "2026-09-10_UMR_peak_analysis"
+author: "Guilherme V Yoshicawa"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Notes
+-
+
+# Setup
+```{r setup, include=FALSE}
+knitr::opts_knit$set(
+  root.dir = "R:/YOSHI2026_EPIALLELES-Q9486/data/Sb-UMRseq-diversity-panel/analysis"
+)
+# run at the start of every R session to set up the environment
+source(Sys.getenv("VSCODE_INIT_R"), chdir = TRUE)
+.First.sys()
+Sys.setenv(RSTUDIO_PANDOC="C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools")
+# install.packages(c("tidyverse", "viridis"))
+library("rmarkdown")
+library("viridis")
+library(tidyverse)
+library(pandoc)
+```
+
+``` {r}
+## Load files (working directory comes from the setup chunk above)
+bp50 <-  read.csv("epic2_50_region_metrics.tsv", sep = "\t", header = TRUE)
+head(bp50)
+bp100 <-  read.csv("epic2_100_region_metrics.tsv", sep = "\t", header = TRUE)
+head(bp100)
+# NB: these two are comma-separated (not tab), with the counts quoted and
+# thousands-separated, e.g. "13,804,781" - so they need sep = "," and the
+# commas stripped before as.numeric(), or every count comes back NA.
+read_counts <-  read.csv("UMR_libraries_reads.csv", sep = ",", header = TRUE)
+low_read    <-  read.csv("low_depth_samples.csv",   sep = ",", header = TRUE)
+
+#samples with reads under 9M will be excluded (9 samples)
+
+# both files carry "Sample" / "Paired reads"; normalise to sample / paired_reads
+parse_reads <- function(df) {
+  df %>%
+    rename(sample = 1, paired_reads = 2) %>%
+    mutate(paired_reads = as.numeric(gsub(",", "", as.character(paired_reads))))
+}
+read_counts <- parse_reads(read_counts)
+low_read    <- parse_reads(low_read)
+
+head(read_counts)
+nrow(low_read)   # samples excluded for low depth
+```
+
+# Combine both bin sizes into one long table
+```{r}
+metrics <- bind_rows(
+  bp50  %>% mutate(bin_size = "50 bp"),
+  bp100 %>% mutate(bin_size = "100 bp")
+) %>%
+  mutate(
+    bin_size = factor(bin_size, levels = c("50 bp", "100 bp")),
+    # guard: samples with empty fields make read.csv return character columns
+    across(c(MEDIAN_LENGTH, MEAN_LENGTH, NUM_REGIONS), as.numeric)
+  ) %>%
+  pivot_longer(
+    cols      = c(MEDIAN_LENGTH, MEAN_LENGTH, NUM_REGIONS),
+    names_to  = "metric",
+    values_to = "value"
+  ) %>%
+  filter(!is.na(value)  # drops samples with empty/NA metrics
+  ) %>%
+  filter(!sample %in% low_read$sample) %>%  # drops samples with low read depth
+  # append the library size so metrics can be modelled against sequencing depth
+  left_join(read_counts, by = "sample") %>%
+  mutate(reads_M = paired_reads / 1e6)
+
+# sanity check: every retained sample should have a read count
+stopifnot(!any(is.na(metrics$paired_reads)))
+
+# per-metric, per-bin summary statistics used for the annotations
+metric_stats <- metrics %>%
+  group_by(metric, bin_size) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(value),
+    median = median(value),
+    sd     = sd(value),
+    .groups = "drop"
+  )
+metric_stats
+```
+
+# Summary statistics: 50 bp vs 100 bp
+```{r}
+# full descriptive table (mean, sd, se, CV, quartiles, range) per metric x bin size
+summary_stats <- metrics %>%
+  group_by(metric, bin_size) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(value),
+    sd     = sd(value),
+    se     = sd(value) / sqrt(n()),
+    cv_pct = 100 * sd(value) / mean(value),
+    min    = min(value),
+    q1     = quantile(value, 0.25),
+    median = median(value),
+    q3     = quantile(value, 0.75),
+    max    = max(value),
+    .groups = "drop"
+  ) %>%
+  mutate(across(where(is.numeric) & !c(n), ~ round(.x, 2))) %>%
+  arrange(metric, bin_size)
+
+summary_stats
+
+# compact "mean ± sd" view, one row per metric
+summary_stats %>%
+  mutate(`mean ± sd` = paste0(format(mean, big.mark = ",", trim = TRUE),
+                              " ± ", format(sd, big.mark = ",", trim = TRUE))) %>%
+  select(metric, bin_size, n, `mean ± sd`, median) %>%
+  pivot_wider(names_from = bin_size, values_from = c(n, `mean ± sd`, median))
+```
+
+# Density histogram function
+```{r}
+plot_metric <- function(which_metric, x_lab, digits = 0,
+                        dat = metrics, stat_tbl = metric_stats) {
+
+  d <- filter(dat, metric == which_metric)
+  s <- filter(stat_tbl, metric == which_metric)
+
+  # multi-line stats label, one line per bin size
+  stat_label <- paste0(
+    s$bin_size, ": mean = ", format(round(s$mean, digits), big.mark = ",", trim = TRUE),
+    ", median = ", format(round(s$median, digits), big.mark = ",", trim = TRUE),
+    " (n = ", s$n, ")",
+    collapse = "\n"
+  )
+
+  ggplot(d, aes(x = value, fill = bin_size, colour = bin_size)) +
+    geom_histogram(
+      aes(y = after_stat(density)),
+      bins = 30, position = "identity",
+      alpha = 0.4, linewidth = 0
+    ) +
+    geom_density(fill = NA, linewidth = 0.3) +
+    geom_vline(
+      data = s, aes(xintercept = mean, colour = bin_size),
+      linetype = "dashed", linewidth = 0.25, inherit.aes = FALSE
+    ) +
+    scale_x_continuous(labels = scales::comma) +
+    scale_fill_viridis_d(option = "plasma", direction = -1, begin = 0.15, end = 0.75) +
+    scale_colour_viridis_d(option = "plasma", direction = -1, begin = 0.15, end = 0.75) +
+    labs(
+      title  = NULL,
+      x      = x_lab,
+      y      = "Density",
+      fill   = "Bin size",
+      colour = "Bin size"
+    ) +
+    # extra headroom so the annotation never collides with the density curves
+    scale_y_continuous(expand = expansion(mult = c(0.02, 0.22))) +
+    annotate(
+      "text", x = Inf, y = Inf, hjust = 1.05, vjust = 1.3,
+      label = stat_label,
+      size = 2.5, lineheight = 1.15
+    ) +
+    theme_classic() +
+    theme(
+      axis.text.x     = element_text(size = 7, colour = "black"),
+      axis.text.y     = element_text(size = 7, colour = "black"),
+      axis.title      = element_text(size = 8, colour = "black"),
+      axis.line       = element_line(linewidth = 0.25, colour = "black"),
+      axis.ticks      = element_line(linewidth = 0.25, colour = "black"),
+      legend.text     = element_text(size = 7),
+      legend.title    = element_text(size = 8, face = "bold"),
+      legend.key.size = unit(0.35, "cm")
+    )
+}
+```
+
+# Median region length
+```{r}
+a <- plot_metric("MEDIAN_LENGTH", "Median region length (bp)")
+a
+```
+
+# Mean region length
+```{r}
+#outlier on 3kb only has frip of 84, and 17M reads - check IGV wig files
+#Sorghum_250_FF_SC557-14E
+b <- plot_metric("MEAN_LENGTH", "Mean region length (bp)")
+b
+```
+
+# Number of regions
+```{r}
+c <- plot_metric("NUM_REGIONS", "Number of regions")
+c
+```
+
+```{r, include=FALSE}
+ggsave("UMR_density_median_length.png", a, width = 14, height = 9, units = "cm")
+ggsave("UMR_density_mean_length.png",   b, width = 14, height = 9, units = "cm")
+ggsave("UMR_density_num_regions.png",   c, width = 14, height = 9, units = "cm")
+```
+
+```{r}
+frip50 <-  read.csv("FRIP_50_scraped.tsv", sep = "\t", header = TRUE)
+head(frip50)
+frip100 <-  read.csv("FRIP_100_scraped.tsv", sep = "\t", header = TRUE)
+head(frip100)
+```
+
+# Combine FRIP scores from both bin sizes
+```{r}
+# header in these files is "sample<TAB>FRIP score", so read.csv names it
+# FRIP.score - select by position to stay robust to that
+frip <- bind_rows(
+  frip50  %>% mutate(bin_size = "50 bp"),
+  frip100 %>% mutate(bin_size = "100 bp")
+) %>%
+  rename(FRIP = 2) %>%
+  mutate(
+    bin_size = factor(bin_size, levels = c("50 bp", "100 bp")),
+    FRIP     = as.numeric(FRIP)
+  ) %>%
+  pivot_longer(cols = FRIP, names_to = "metric", values_to = "value") %>%
+  filter(!is.na(value)) %>%                 # drops samples with empty/NA FRIP
+  filter(!sample %in% low_read$sample) %>%  # same low-depth exclusion as metrics
+  # append the library size so FRIP can also be checked against depth
+  left_join(read_counts, by = "sample") %>%
+  mutate(reads_M = paired_reads / 1e6)
+
+stopifnot(!any(is.na(frip$paired_reads)))
+
+frip_stats <- frip %>%
+  group_by(metric, bin_size) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(value),
+    median = median(value),
+    sd     = sd(value),
+    .groups = "drop"
+  )
+frip_stats
+```
+
+# FRIP summary statistics: 50 bp vs 100 bp
+```{r}
+frip_summary <- frip %>%
+  group_by(bin_size) %>%
+  summarise(
+    n      = n(),
+    mean   = mean(value),
+    sd     = sd(value),
+    se     = sd(value) / sqrt(n()),
+    cv_pct = 100 * sd(value) / mean(value),
+    min    = min(value),
+    q1     = quantile(value, 0.25),
+    median = median(value),
+    q3     = quantile(value, 0.75),
+    max    = max(value),
+    .groups = "drop"
+  ) %>%
+  mutate(across(where(is.numeric) & !c(n), ~ round(.x, 2)))
+
+frip_summary
+
+# compact "mean ± sd" view
+frip_summary %>%
+  mutate(`mean ± sd` = paste0(mean, " ± ", sd)) %>%
+  select(bin_size, n, `mean ± sd`, median, min, max)
+```
+
+# Paired comparison of FRIP between bin sizes
+```{r}
+frip_paired <- frip %>%
+  pivot_wider(names_from = bin_size, values_from = value,
+              names_prefix = "bin_") %>%
+  filter(!is.na(`bin_50 bp`), !is.na(`bin_100 bp`)) %>%
+  mutate(diff = `bin_50 bp` - `bin_100 bp`)
+
+frip_tests <- frip_paired %>%
+  summarise(
+    n_pairs    = n(),
+    mean_50    = mean(`bin_50 bp`),
+    sd_50      = sd(`bin_50 bp`),
+    mean_100   = mean(`bin_100 bp`),
+    sd_100     = sd(`bin_100 bp`),
+    mean_diff  = mean(diff),
+    sd_diff    = sd(diff),
+    pct_change = 100 * mean(diff) / mean(`bin_100 bp`),  # 50 bp vs 100 bp
+    t_p        = t.test(`bin_50 bp`, `bin_100 bp`, paired = TRUE)$p.value,
+    wilcox_p   = wilcox.test(`bin_50 bp`, `bin_100 bp`, paired = TRUE)$p.value,
+    cohens_dz  = mean(diff) / sd(diff),                  # paired effect size
+    r_pearson  = cor(`bin_50 bp`, `bin_100 bp`)          # agreement between bins
+  ) %>%
+  mutate(across(where(is.numeric) & !c(n_pairs), ~ signif(.x, 3)))
+
+frip_tests
+```
+
+# FRIP density histogram
+```{r}
+d <- plot_metric("FRIP", "FRIP score (%)", digits = 2,
+                 dat = frip, stat_tbl = frip_stats)
+d
+```
+
+# Save FRIP figure
+```{r}
+ggsave("UMR_density_FRIP.png", d, width = 14, height = 9, units = "cm")
+```
+
+# Region metrics vs sequencing depth
+```{r}
+# how much of the variation in each metric is explained by library size?
+depth_cor <- metrics %>%
+  group_by(metric, bin_size) %>%
+  summarise(
+    n            = n(),
+    slope        = coef(lm(value ~ reads_M))[2],   # change per million reads
+    r_pearson    = cor(reads_M, value),
+    r2           = cor(reads_M, value)^2,
+    rho_spearman = cor(reads_M, value, method = "spearman"),
+    p_pearson    = cor.test(reads_M, value)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p_adj = p.adjust(p_pearson, method = "BH"),
+    across(where(is.numeric) & !c(n), ~ signif(.x, 3))
+  ) %>%
+  arrange(metric, bin_size)
+
+depth_cor
+```
+
+# Scatter function: metric vs read count
+```{r}
+plot_vs_depth <- function(which_metric, y_lab,
+                          dat = metrics, stat_tbl = depth_cor) {
+
+  d <- filter(dat, metric == which_metric)
+  s <- filter(stat_tbl, metric == which_metric)
+
+  stat_label <- paste0(
+    s$bin_size, ": R² = ", format(round(s$r2, 2), nsmall = 2),
+    ", rho = ", format(round(s$rho_spearman, 2), nsmall = 2),
+    collapse = "\n"
+  )
+
+  ggplot(d, aes(x = reads_M, y = value, colour = bin_size, fill = bin_size)) +
+    geom_point(size = 0.5, alpha = 0.6, stroke = 0) +
+    geom_smooth(method = "lm", se = TRUE, linewidth = 0.4, alpha = 0.15) +
+    scale_x_continuous(labels = scales::comma) +
+    scale_y_continuous(labels = scales::comma,
+                       expand = expansion(mult = c(0.02, 0.18))) +
+    scale_fill_viridis_d(option = "plasma", direction = -1,
+                         begin = 0.15, end = 0.75) +
+    scale_colour_viridis_d(option = "plasma", direction = -1,
+                           begin = 0.15, end = 0.75) +
+    labs(
+      title  = NULL,
+      x      = "Paired reads (millions)",
+      y      = y_lab,
+      fill   = "Bin size",
+      colour = "Bin size"
+    ) +
+    annotate(
+      "text", x = Inf, y = Inf, hjust = 1.05, vjust = 1.3,
+      label = stat_label,
+      size = 2.5, lineheight = 1.15
+    ) +
+    theme_classic() +
+    theme(
+      axis.text.x     = element_text(size = 7, colour = "black"),
+      axis.text.y     = element_text(size = 7, colour = "black"),
+      axis.title      = element_text(size = 8, colour = "black"),
+      axis.line       = element_line(linewidth = 0.25, colour = "black"),
+      axis.ticks      = element_line(linewidth = 0.25, colour = "black"),
+      legend.text     = element_text(size = 7),
+      legend.title    = element_text(size = 8, face = "bold"),
+      legend.key.size = unit(0.35, "cm")
+    )
+}
+```
+
+# Median region length vs read count
+```{r}
+e <- plot_vs_depth("MEDIAN_LENGTH", "Median region length (bp)")
+e
+```
+
+# Mean region length vs read count
+```{r}
+f <- plot_vs_depth("MEAN_LENGTH", "Mean region length (bp)")
+f
+```
+
+# Number of regions vs read count
+```{r}
+g <- plot_vs_depth("NUM_REGIONS", "Number of regions")
+g
+```
+
+# Save depth figures
+```{r, include=FALSE}
+ggsave("UMR_depth_median_length.png", e, width = 14, height = 9, units = "cm")
+ggsave("UMR_depth_mean_length.png",   f, width = 14, height = 9, units = "cm")
+ggsave("UMR_depth_num_regions.png",   g, width = 14, height = 9, units = "cm")
+```
+
+# FRIP vs sequencing depth
+```{r}
+# same correlation table as depth_cor, built on the FRIP data
+frip_depth_cor <- frip %>%
+  group_by(metric, bin_size) %>%
+  summarise(
+    n            = n(),
+    slope        = coef(lm(value ~ reads_M))[2],   # FRIP % per million reads
+    r_pearson    = cor(reads_M, value),
+    r2           = cor(reads_M, value)^2,
+    rho_spearman = cor(reads_M, value, method = "spearman"),
+    p_pearson    = cor.test(reads_M, value)$p.value,
+    .groups = "drop"
+  ) %>%
+  mutate(
+    p_adj = p.adjust(p_pearson, method = "BH"),
+    across(where(is.numeric) & !c(n), ~ signif(.x, 3))
+  )
+
+frip_depth_cor
+
+h <- plot_vs_depth("FRIP", "FRIP score (%)",
+                   dat = frip, stat_tbl = frip_depth_cor)
+h
+```
+
+```{r,include=FALSE}
+ggsave("UMR_depth_FRIP.png", h, width = 14, height = 9, units = "cm")
+```

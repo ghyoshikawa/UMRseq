@@ -142,7 +142,7 @@ epic2_v3.8 \
 /home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0/Sbicolor_730_v5.0.chrom.sizes \
 100 \
 /home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0/Sbicolor_730_v5.0-fragments-filtered-50%Ns.bed \
-a_agfs_ps
+
 
 
 #change /analysis/trimmed_align_bowtie.
@@ -305,3 +305,7 @@ awk '{ total += $2 } END { print total/NR }' -
 
 ## but Akshya says at this read depth we should be getting double the peaks.
 #Akshya runs epic2 with bin size 50. Lets try that next.
+#tried that, see sorghum pop UMR QC.rmd and html file
+
+git config --global user.email "g.vyoshikawa@uq.edu.au"
+  git config --global user.name "Guilherme Pedro Ventura Yoshicawa Simoes Silva"
