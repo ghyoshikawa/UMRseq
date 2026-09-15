@@ -1,11 +1,7 @@
-#tmux session
+git config --global user.email "g.vyoshikawa@uq.edu.au"
+git config --global user.name "Guilherme Pedro Ventura Yoshicawa Simoes Silva"
 
-#Log into bunya
-#create new temrinal:
-tmux new -s sessionName
 
-cd /scratch/user/uqgventu/
-cd /QRISdata/Q9486/data/Sb-UMRseq-diversity-panel/AGRF_CAGRF221112563_HMCLFDSX5
 
 cp Sorghum_343_FF_SC831-14E_HMCLFDSX5_GCTTCATATT-AGGCTGAACG_L002_R*.fastq.gz /scratch/user/uqgventu/reads/
 cp Sorghum_10_FF_RTx7000_HMCLFDSX5_CGGTTACGGC-CTATAGTCTT_L001_R*.fastq.gz /scratch/user/uqgventu/reads/
@@ -307,5 +303,57 @@ awk '{ total += $2 } END { print total/NR }' -
 #Akshya runs epic2 with bin size 50. Lets try that next.
 #tried that, see sorghum pop UMR QC.rmd and html file
 
-git config --global user.email "g.vyoshikawa@uq.edu.au"
-  git config --global user.name "Guilherme Pedro Ventura Yoshicawa Simoes Silva"
+###BEGIN PRES/ABS ANALYSIS
+
+#remove low-read samples from epic2 analysis, done
+
+tail -n +2 low_qual_samples.csv | cut -d',' -f1 | \
+grep -vFf - samples_renamed_merged.txt > samples_renamed_merged_filtered.txt
+
+#create conda env with python for analysis, done
+bash /home/uqgventu/gitrepos/AI_code_dev_testing/20-EPIC2_reformat_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.50.epic2.bed \
+./analysis/trimmed_align_bowtie2_epic2 \
+./analysis/umr_names \
+20:00 \
+2 \
+UMR_calling \
+a_agfs_ps
+
+#8Gb of memorey not enough
+bash /home/uqgventu/gitrepos/AI_code_dev_testing/21-UMR_consensus_merge_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.50.epic2.bed \
+./analysis/umr_names \
+./analysis/umr_consensus \
+all_samples \
+50 \
+2:00:00 \
+20 \
+UMR_calling \
+a_agfs_ps
+
+bash /home/uqgventu/gitrepos/AI_code_dev_testing/21b-UMR_consensus_merge_background_sbatch.sh \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.bed \
+/home/uqgventu/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0.fa.fai \
+./analysis/umr_consensus \
+0.2 \
+12345 \
+2:00:00 \
+8 \
+UMR_calling \
+a_agfs_ps
+
+bash /home/uqgventu/gitrepos/AI_code_dev_testing/22-UMR_featurecounts_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.bam \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.saf \
+./analysis/trimmed_align_bowtie2 \
+./umr_counts \
+20:00 \
+6 \
+UMR_calling \
+a_agfs_ps
+
+

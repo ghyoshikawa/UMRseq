@@ -440,3 +440,39 @@ h
 ```{r,include=FALSE}
 ggsave("UMR_depth_FRIP.png", h, width = 14, height = 9, units = "cm")
 ```
+
+#find frip score of removed samples
+```{r}
+frip_removed <- frip50 %>%
+  rename(FRIP = 2) %>%                                  # header is "FRIP.score"
+  mutate(FRIP = as.numeric(FRIP)) %>%
+  left_join(read_counts, by = "sample") %>%             # depth for every sample
+  mutate(
+    reads_M   = paired_reads / 1e6,
+    low_depth = sample %in% low_read$sample             # TRUE = excluded sample
+  ) %>%
+  arrange(FRIP)
+
+# the excluded samples on their own
+frip_removed %>% filter(low_depth)
+
+# do low-depth samples have lower FRIP?
+frip_removed %>%
+  group_by(low_depth) %>%
+  summarise(n = n(), median_FRIP = median(FRIP, na.rm = TRUE),
+            mean_FRIP = mean(FRIP, na.rm = TRUE), .groups = "drop")
+
+wilcox.test(FRIP ~ low_depth, data = frip_removed)
+
+# FRIP vs depth across all samples, including the excluded ones
+cor.test(frip_removed$reads_M, frip_removed$FRIP, method = "spearman")
+
+ggplot(frip_removed, aes(reads_M, FRIP, colour = low_depth)) +
+  geom_point(size = 1.5) +
+  labs(x = "Paired reads (M)", y = "FRIP score (%)", colour = "Low depth")
+
+  #isolate samples with FRIP < 60
+low_frip <- frip_removed %>% filter(FRIP < 60)
+low_frip
+
+```
