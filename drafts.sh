@@ -350,10 +350,59 @@ samples_renamed_merged_filtered.txt \
 .bam \
 ./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.saf \
 ./analysis/trimmed_align_bowtie2 \
-./umr_counts \
+./analysis/umr_counts \
 20:00 \
 6 \
 UMR_calling \
 a_agfs_ps
 
 
+
+bash /home/$USER/gitrepos/AI_code_dev_testing/23-UMR_featurecounts_summary_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_counts \
+all_samples \
+0:30:00 \
+2 \
+UMR_calling \
+a_agfs_ps
+
+bash /home/$USER/gitrepos/AI_code_dev_testing/24-UMR_combine_calls_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_calling \
+all_samples \
+1000 \
+15:00 \
+10 \
+UMR_calling \
+a_agfs_ps
+
+bash /home/$USER/gitrepos/AI_code_dev_testing/25-UMR_calls_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+./analysis/umr_calling/calls \
+30:00 \
+5 \
+UMR_calling \
+a_agfs_ps
+
+bash /home/$USER/gitrepos/AI_code_dev_testing/26-UMR_calls_table_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_calling/calls \
+./analysis/umr_calling \
+all_samples \
+0:10:00 \
+2 \
+a_agfs_ps
+
+bash /home/$USER/gitrepos/AI_code_dev_testing/27-UMR_calls_qc_plots_sbatch.sh \
+./analysis/umr_calling/all_samples.UMR.calls.tsv \
+./analysis/umr_calling/all_samples.umr_counts.cpm.tsv \
+./analysis/umr_calling/qc_plots \
+50 \
+10:00 \
+4 \
+UMR_calling \
+a_agfs_ps
