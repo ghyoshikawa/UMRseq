@@ -42,6 +42,7 @@ samples_renamed_merged.txt \
 40 \
 a_agfs_ps
 
+
 cd /scratch/user/uqgventu/logs/20260617-175654_02-bowtie2
 
 # scrape logs to get summary and also to check mapping of all samples worked
