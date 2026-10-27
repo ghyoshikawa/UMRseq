@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s -A \"Mozilla/5.0\" \"https://zenodo.org/api/records/15348871\")",
+      "Bash(ls -la \"/c/Users/a1869161/AppData/Local/Programs/R/R-4.5.2/bin/x64/\" 2>&1 | head -20)",
+      "Read(//c/Users/a1869161/AppData/Local/Programs/R/R-4.5.2/bin/**)",
+      "Read(//c/Program Files/R/**)",
+      "Read(//c/Users/uqgventu/AppData/Local/Programs/**)",
+      "Bash(where.exe R.exe Rterm.exe Rscript.exe)",
+      "Bash(echo \"=== R_lib \\(your target\\) ===\"; ls \"/c/Users/uqgventu/OneDrive - The University of Queensland/Scripts/R_lib\" 2>&1 | head -20; echo \"=== count ===\"; ls \"/c/Users/uqgventu/OneDrive - The University of Queensland/Scripts/R_lib\" 2>/dev/null | wc -l *)",
+      "Read(//c/Users/uqgventu/AppData/Local/R/win-library/4.6/**)",
+      "Bash(\"/c/Program Files/R/R-4.6.1/bin/x64/Rscript.exe\" -e \"for \\(p in c\\('tidyverse','ggthemes','RColorBrewer','dplyr','wesanderson'\\)\\) { ok <- suppressWarnings\\(suppressMessages\\(require\\(p, character.only=TRUE, quietly=TRUE\\)\\)\\); cat\\(sprintf\\('%-14s %s\\\\n', p, if \\(ok\\) 'OK' else 'FAILED'\\)\\) }\")",
+      "Bash(\"/c/Program Files/R/R-4.6.1/bin/x64/Rscript.exe\" -e \"cat\\('jsonlite:', requireNamespace\\('jsonlite', quietly=TRUE\\), '\\\\n'\\); cat\\('rlang:', requireNamespace\\('rlang', quietly=TRUE\\), '\\\\n'\\)\")",
+      "Bash('/c/Program Files/R/R-4.6.1/bin/x64/Rscript.exe' -e ' *)"
+    ]
+  }
+}
