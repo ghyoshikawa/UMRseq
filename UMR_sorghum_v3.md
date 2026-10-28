@@ -72,8 +72,8 @@ bash \
 -A a_agfs_ps \
 -m 30 \
 -c 1 \
--t 15:00:00
-#this block failed with 10h walltime, seems like it only had a few more lines to go. increased walltime to 15h
+-t 1-0:00:00
+#this block failed with 10/15h walltime, seems like it only had a few more lines to go. increased walltime to 15h
 
 ```
 
@@ -144,13 +144,13 @@ remove low quality samples
 tail -n +2 low_qual_samples.csv | cut -d',' -f1 | \
 grep -vFf - samples_renamed_merged.txt > samples_renamed_merged_filtered.txt
 
-cd /scratch/user/$USER/
+cd /scratch/user/$USER/v5
 
 #change the file suffix accordingly
 bash ~/gitrepos/umrseq/consensus_UMR/20-EPIC2_reformat_sbatch.sh \
 samples_renamed_merged_filtered.txt \
-.50.epic2.bed \
-./analysis/trimmed_align_bowtie2_epic2 \
+.100.epic2.bed \
+./analysis/trimmed_align_bowtie2_epic2_bin100 \
 ./analysis/umr_names \
 20:00 \
 2 \
@@ -159,12 +159,23 @@ a_agfs_ps
 
 bash ~/gitrepos/umrseq/consensus_UMR/21-UMR_consensus_merge_sbatch.sh  \
 samples_renamed_merged_filtered.txt \
-.50.epic2.bed \
+.100.epic2.bed \
 ./analysis/umr_names \
 ./analysis/umr_consensus \
 all_samples \
 50 \
 30:00 \
 20 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/21b-UMR_consensus_merge_background_sbatch.sh \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.bed \
+~/UMR_sorghum/genome/v5.1/assembly/Sbicolor_730_v5.0.fa.fai \
+./analysis/umr_consensus \
+0.2 \
+12345 \
+2:00:00 \
+8 \
 UMR_calling \
 a_agfs_ps
