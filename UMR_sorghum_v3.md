@@ -72,12 +72,15 @@ bash \
 -A a_agfs_ps \
 -m 30 \
 -c 1 \
--t 10:00:00
+-t 15:00:00
+#this block failed with 10h walltime, seems like it only had a few more lines to go. increased walltime to 15h
+
 ```
 
 # Now call umrs using epic2, change to v3 files
 
 ```bash
+cd /scratch/user/uqgventu
 bash \
 /home/uqgventu/gitrepos/umrseq/UMRseq/05-epic2_sbatch.sh \
 samples_renamed_merged.txt \
