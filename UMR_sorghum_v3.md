@@ -74,6 +74,7 @@ bash \
 -c 1 \
 -t 1-0:00:00
 #this block failed with 10/15h walltime, seems like it only had a few more lines to go. increased walltime to 15h
+#actually there is already a blacklist in the refseq folder but it was mislabelled (v2 is actually v3, scaffold names don't match v2's). Instead use that one.
 
 ```
 
@@ -88,9 +89,9 @@ samples_renamed_merged.txt \
 20 \
 /scratch/user/uqgventu/analysis/trimmed_align_bowtie2 \
 epic2_v3.8 \
-/home/uqgventu/UMR_sorghum/genome/v3.0/assembly/output/Sbicolor_454_v3.0.1.chrom.sizes \
+/home/uqgventu/refseqs/sorghum/Sbicolor_454_v3.0.1.chrom.sizes \
 50 \
-/home/uqgventu/UMR_sorghum/genome/v3.0/assembly/output/Sbicolor_454_v3.0.1-fragments-filtered-50%Ns.bed \
+/home/uqgventu/refseqs/sorghum/sorghum_Btx623-fragments-filtered-v2-50%Ns.bed \
 a_agfs_ps
 
 bin_Size=50
@@ -163,7 +164,7 @@ samples_renamed_merged_filtered.txt \
 ./analysis/umr_names \
 ./analysis/umr_consensus \
 all_samples \
-50 \
+100 \
 30:00 \
 20 \
 UMR_calling \
@@ -178,4 +179,54 @@ bash ~/gitrepos/umrseq/consensus_UMR/21b-UMR_consensus_merge_background_sbatch.s
 2:00:00 \
 8 \
 UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/22-UMR_featurecounts_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.bam \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.saf \
+./analysis/trimmed_align_bowtie2 \
+./analysis/umr_counts \
+20:00 \
+6 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/23-UMR_featurecounts_summary_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_counts \
+all_samples \
+0:15:00 \
+2 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/24-UMR_combine_calls_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_calling \
+all_samples \
+1000 \
+15:00 \
+5 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/25-UMR_calls_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+./analysis/umr_calling/calls \
+30:00 \
+5 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/26-UMR_calls_table_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_calling/calls \
+./analysis/umr_calling \
+all_samples \
+0:10:00 \
+2 \
 a_agfs_ps
