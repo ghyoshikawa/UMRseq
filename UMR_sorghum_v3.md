@@ -1,7 +1,7 @@
 # running the UMRseq pipeline for sorghum population data
 # using previous trimmed reads, to align to v3 for Dr Claire Huang
 
-# for v3.0.1 reference genome:
+For v3.0.1 reference genome:
 github repo has been recloned to account for previous changes. File names have previously been edited to group lanes and drop adapter sequences from file name.
 
 ```bash
@@ -45,6 +45,7 @@ cat MAPQ_filter_summary.tsv | column -t
 ```
 
 # Have to create a blacklist for v3 oops
+Skip this bit, I gave up as I found a file 
 
 ```bash 
 cd /home/uqgventu/UMR_sorghum/genome/v3.0/assembly/
@@ -73,12 +74,12 @@ bash \
 -m 30 \
 -c 1 \
 -t 1-0:00:00
-#this block failed with 10/15h walltime, seems like it only had a few more lines to go. increased walltime to 15h
-#actually there is already a blacklist in the refseq folder but it was mislabelled (v2 is actually v3, scaffold names don't match v2's). Instead use that one.
+#this block failed with 10/15h walltime. 
+
 
 ```
 
-# Now call umrs using epic2, change to v3 files
+Now call umrs using epic2, change to v3 files, bin size 50 bp
 
 ```bash
 cd /scratch/user/uqgventu
@@ -89,9 +90,9 @@ samples_renamed_merged.txt \
 20 \
 /scratch/user/uqgventu/analysis/trimmed_align_bowtie2 \
 epic2_v3.8 \
-/home/uqgventu/refseqs/sorghum/Sbicolor_454_v3.0.1.chrom.sizes \
+~/UMR_sorghum/genome/v3.0/assembly/output/Sbicolor_454_v3.0.1.chrom.sizes \
 50 \
-/home/uqgventu/refseqs/sorghum/sorghum_Btx623-fragments-filtered-v2-50%Ns.bed \
+~/UMR_sorghum/genome/v3.0/assembly/output/Sbicolor_454_v3.0.1-fragments-filtered-50%Ns.bed \
 a_agfs_ps
 
 bin_Size=50
@@ -131,13 +132,128 @@ cat epic2_region_metrics.tsv | column -t
 #median
 sed '1d' epic2_region_metrics.tsv |
 awk '{ total += $2 } END { print total/NR }' -
+#650 bp
 #mean
 sed '1d' epic2_region_metrics.tsv |
 awk '{ total += $3 } END { print total/NR }' -
+#870 bp
 
+#scrape FRIP logs:
+cd /scratch/user/$USER/analysis/trimmed_align_bowtie2_epic2_FRIP
+for i in $(cat ../../samples_renamed_merged.txt); do
+  SAMPLE=$i
+  FRIP=$(awk '/percent/{getline; print}' ${i}_FRIP_counts.tab | cut -f 3)
+  echo -e "$SAMPLE\t$FRIP"
+  done > FRIP_scraped.tsv
+# add headder
+echo -e 'sample\tFRIP score' \
+| cat - FRIP_scraped.tsv > temp && mv temp FRIP_scraped.tsv
+
+cat FRIP_scraped.tsv | column -t
+
+#get FRIP score average:
+sed '1d' FRIP_scraped.tsv |
+awk '{ total += $2 } END { print total/NR }' -
 ```
 
-# consensus UMRs 
+# consensus UMRs for v3
+remove low quality samples
+```bash
+#remove low-read samples from epic2 analysis, FRiP <60, >9M reads
+cd ../..
+
+tail -n +2 low_qual_v3.csv | cut -d',' -f1 | \
+grep -vFf - samples_renamed_merged.txt > samples_renamed_merged_filtered.txt
+
+#25 samples lost due to <9M reads or FRiP<60
+
+bash ~/gitrepos/umrseq/consensus_UMR/20-EPIC2_reformat_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.50.epic2.bed \
+./analysis/trimmed_align_bowtie2_epic2 \
+./analysis/umr_names \
+20:00 \
+2 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/21-UMR_consensus_merge_sbatch.sh  \
+samples_renamed_merged_filtered.txt \
+.50.epic2.bed \
+./analysis/umr_names \
+./analysis/umr_consensus \
+all_samples \
+100 \
+30:00 \
+20 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/21b-UMR_consensus_merge_background_sbatch.sh \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.bed \
+~/UMR_sorghum/genome/v3.0/assembly/Sbicolor_454_v3.0.1.fa.fai \
+./analysis/umr_consensus \
+0.2 \
+12345 \
+2:00:00 \
+8 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/22-UMR_featurecounts_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+.bam \
+./analysis/umr_consensus/all_samples.umr.merged.consensus.noALT.saf \
+./analysis/trimmed_align_bowtie2 \
+./analysis/umr_counts \
+20:00 \
+6 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/23-UMR_featurecounts_summary_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_counts \
+all_samples \
+0:15:00 \
+2 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/24-UMR_combine_calls_sbatch.sh \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_counts \
+./analysis/umr_calling \
+all_samples \
+1000 \
+15:00 \
+5 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/25-UMR_calls_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+./analysis/umr_calling/calls \
+30:00 \
+5 \
+UMR_calling \
+a_agfs_ps
+
+bash ~/gitrepos/umrseq/consensus_UMR/26-UMR_calls_table_sbatch.sh \
+./analysis/umr_calling/batches/batch_list.txt \
+samples_renamed_merged_filtered.txt \
+./analysis/umr_calling/calls \
+./analysis/umr_calling \
+all_samples \
+0:10:00 \
+2 \
+a_agfs_ps
+
+#Done!
+```
+# consensus UMRs for v5 with epic2 bin size 100bp
+
 remove low quality samples
 ```bash
 #remove low-read samples from epic2 analysis, FRiP <60, >9M reads
@@ -230,3 +346,15 @@ all_samples \
 0:10:00 \
 2 \
 a_agfs_ps
+
+```
+# SNP investigation from UMRs
+
+Now that the alignments and consensus UMRs have been called, we proceed to call SNPs from UMRs. 
+
+Also have to look into generating consensus UMRs based on read count levels rather than UMR presence or absence
+
+Both Pete and Claire have shared a script, so can compare both of them and pick the best?
+
+
+```
